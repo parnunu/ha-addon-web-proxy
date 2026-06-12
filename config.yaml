@@ -1,0 +1,35 @@
+name: Lightweight Web Proxy
+version: "1.0.0"
+slug: lightweight_web_proxy
+description: >-
+  Lightweight nginx reverse proxy for exposing a web UI through Home Assistant OS add-on ingress.
+url: https://github.com/parnunu/ha-addon-web-proxy
+arch:
+  - aarch64
+  - amd64
+  - armv7
+startup: application
+init: false
+stage: stable
+ingress: true
+ingress_port: 8099
+ingress_entry: /
+panel_icon: mdi:web
+ports:
+  "8099/tcp": null
+ports_description:
+  "8099/tcp": "Optional direct web proxy port; ingress works without exposing this port."
+options:
+  target_url: "http://homeassistant.local:8123"
+  host_header: ""
+  allow_insecure_ssl: false
+  request_timeout: 300
+  max_body_size: "64m"
+  log_level: "notice"
+schema:
+  target_url: url
+  host_header: str?
+  allow_insecure_ssl: bool
+  request_timeout: int(1,3600)
+  max_body_size: str
+  log_level: list(debug|info|notice|warn|error)

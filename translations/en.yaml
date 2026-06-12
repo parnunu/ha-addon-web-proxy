@@ -1,0 +1,19 @@
+configuration:
+  target_url:
+    name: Target URL
+    description: Absolute http:// or https:// URL of the web service to proxy.
+  host_header:
+    name: Host header
+    description: Optional Host header override. Leave blank to use the target host.
+  allow_insecure_ssl:
+    name: Allow insecure SSL
+    description: Disable upstream HTTPS certificate verification for private/self-signed certificates.
+  request_timeout:
+    name: Request timeout
+    description: Proxy connect, send, and read timeout in seconds.
+  max_body_size:
+    name: Max body size
+    description: nginx client_max_body_size value, for example 64m.
+  log_level:
+    name: Log level
+    description: nginx error log level.
