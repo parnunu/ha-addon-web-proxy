@@ -1,5 +1,5 @@
 name: Lightweight Forward Proxy
-version: "1.0.2"
+version: "1.0.3"
 slug: lightweight_forward_proxy
 description: >-
   Lightweight HTTP/HTTPS forward proxy for Home Assistant OS.

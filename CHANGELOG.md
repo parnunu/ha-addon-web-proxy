@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+
+- Add `build.yaml` so HAOS Supervisor passes the correct Home Assistant base image for each architecture.
+- Fix aarch64 installs failing when Docker tried to build from the amd64 base image.
+
 ## 1.0.2
 
 - Fix HAOS install/build failures caused by downloading Alpine packages during local add-on builds.
