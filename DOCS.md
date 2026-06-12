@@ -1,49 +1,66 @@
-# Home Assistant Add-on: Lightweight Web Proxy
+# Home Assistant Add-on: Lightweight Forward Proxy
 
 ## Configuration
 
 ```yaml
-target_url: "http://192.168.1.10:8080"
-host_header: ""
-allow_insecure_ssl: false
-request_timeout: 300
-max_body_size: "64m"
-log_level: "notice"
+port: 8888
+allowed_networks:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+max_clients: 100
+connect_ports:
+  - 443
+  - 563
+upstream_proxy: ""
+log_level: "Info"
 ```
 
-### Option: `target_url`
+### Option: `port`
 
-Absolute URL for the upstream web UI. Supported schemes are `http://` and `https://`.
+The forward proxy listen port. The default is `8888`.
 
-### Option: `host_header`
+### Option: `allowed_networks`
 
-Optional Host header override. Leave blank for the proxy to send the target host.
+Client IP addresses or CIDR ranges that may use the proxy. Keep this list as narrow as possible.
 
-### Option: `allow_insecure_ssl`
+Examples:
 
-Controls certificate verification for HTTPS upstreams.
+```yaml
+allowed_networks:
+  - "192.168.1.0/24"
+  - "10.8.0.5"
+```
 
-- `false`: Verify certificates using the container CA bundle.
-- `true`: Disable verification for self-signed/private certificates.
+### Option: `max_clients`
 
-### Option: `request_timeout`
+Maximum simultaneous proxy clients.
 
-Connect, send, and read timeout in seconds. Valid range: 1-3600.
+### Option: `connect_ports`
 
-### Option: `max_body_size`
+Ports allowed for HTTPS `CONNECT` tunneling. Defaults to `443` and `563`.
 
-nginx `client_max_body_size`. Examples: `16m`, `64m`, `1g`.
+### Option: `upstream_proxy`
+
+Optional parent proxy in `host:port` form. Leave blank for direct outbound connections.
 
 ### Option: `log_level`
 
-nginx error log level: `debug`, `info`, `notice`, `warn`, or `error`.
+tinyproxy log level: `Critical`, `Error`, `Warning`, `Notice`, `Connect`, or `Info`.
 
-## Access
+## Client setup
 
-After starting the add-on, use **Open Web UI** from the add-on page. You can also map `8099/tcp` to a host port if you need direct LAN access, but ingress is the intended default.
+Set your client HTTP proxy to:
+
+```text
+http://<home-assistant-host>:8888
+```
+
+For HTTPS clients, use the same proxy endpoint. tinyproxy tunnels HTTPS using `CONNECT` for ports listed in `connect_ports`.
 
 ## Troubleshooting
 
-- If the add-on starts but the UI is blank, confirm `target_url` is reachable from the Home Assistant host/network.
-- For HTTPS services with private certificates, either install a certificate trusted by the container or set `allow_insecure_ssl: true`.
-- If the upstream expects a specific virtual host, set `host_header` to that hostname.
+- If clients cannot connect, confirm the add-on port mapping is enabled and reachable from the client network.
+- If requests are denied, add the client IP or network to `allowed_networks`.
+- If HTTPS to a non-standard port fails, add that port to `connect_ports`.
+- Do not expose the proxy to untrusted networks.

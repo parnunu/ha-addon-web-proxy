@@ -1,19 +1,19 @@
 configuration:
-  target_url:
-    name: Target URL
-    description: Absolute http:// or https:// URL of the web service to proxy.
-  host_header:
-    name: Host header
-    description: Optional Host header override. Leave blank to use the target host.
-  allow_insecure_ssl:
-    name: Allow insecure SSL
-    description: Disable upstream HTTPS certificate verification for private/self-signed certificates.
-  request_timeout:
-    name: Request timeout
-    description: Proxy connect, send, and read timeout in seconds.
-  max_body_size:
-    name: Max body size
-    description: nginx client_max_body_size value, for example 64m.
+  port:
+    name: Proxy port
+    description: HTTP/HTTPS forward proxy listen port.
+  allowed_networks:
+    name: Allowed networks
+    description: Client IP addresses or CIDR ranges allowed to use the proxy.
+  max_clients:
+    name: Max clients
+    description: Maximum simultaneous proxy clients.
+  connect_ports:
+    name: CONNECT ports
+    description: Ports allowed for HTTPS CONNECT tunneling.
+  upstream_proxy:
+    name: Upstream proxy
+    description: Optional parent proxy in host:port form.
   log_level:
     name: Log level
-    description: nginx error log level.
+    description: tinyproxy log level.

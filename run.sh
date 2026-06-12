@@ -3,119 +3,81 @@ set -Eeuo pipefail
 
 source /usr/lib/bashio/bashio.sh
 
-readonly LISTEN_PORT=8099
-readonly NGINX_CONFIG=/etc/nginx/nginx.conf
-readonly PROXY_CONFIG=/etc/nginx/http.d/web-proxy.conf
+readonly TINYPROXY_CONFIG=/etc/tinyproxy/tinyproxy.conf
 
 fail() {
     bashio::log.error "$1"
     exit 1
 }
 
-escape_nginx_value() {
-    local value=${1}
-    printf '%s' "${value}" | sed -e 's/\\/\\\\/g' -e 's/;/\\;/g'
+json_array_lines() {
+    local option=${1}
+    jq -r ".${option} // [] | .[]" /data/options.json
 }
 
-read_option() {
-    local name=${1}
-    bashio::config "${name}"
-}
+PORT=$(bashio::config port)
+MAX_CLIENTS=$(bashio::config max_clients)
+UPSTREAM_PROXY=$(bashio::config upstream_proxy)
+LOG_LEVEL=$(bashio::config log_level)
 
-TARGET_URL=$(read_option target_url)
-HOST_HEADER=$(read_option host_header)
-ALLOW_INSECURE_SSL=$(read_option allow_insecure_ssl)
-REQUEST_TIMEOUT=$(read_option request_timeout)
-MAX_BODY_SIZE=$(read_option max_body_size)
-LOG_LEVEL=$(read_option log_level)
+[[ "${PORT}" =~ ^[0-9]+$ ]] || fail "port must be an integer."
+(( PORT >= 1 && PORT <= 65535 )) || fail "port must be between 1 and 65535."
 
-[[ -n "${TARGET_URL}" ]] || fail "target_url must not be empty."
-[[ "${TARGET_URL}" =~ ^https?://[^[:space:]/]+.*$ ]] || fail "target_url must be an absolute http:// or https:// URL."
-
-[[ "${REQUEST_TIMEOUT}" =~ ^[0-9]+$ ]] || fail "request_timeout must be an integer."
-(( REQUEST_TIMEOUT >= 1 && REQUEST_TIMEOUT <= 3600 )) || fail "request_timeout must be between 1 and 3600 seconds."
+[[ "${MAX_CLIENTS}" =~ ^[0-9]+$ ]] || fail "max_clients must be an integer."
+(( MAX_CLIENTS >= 1 && MAX_CLIENTS <= 10000 )) || fail "max_clients must be between 1 and 10000."
 
 case "${LOG_LEVEL}" in
-    debug|info|notice|warn|error) ;;
-    *) fail "log_level must be one of debug, info, notice, warn, or error." ;;
+    Critical|Error|Warning|Notice|Connect|Info) ;;
+    *) fail "log_level must be one of Critical, Error, Warning, Notice, Connect, or Info." ;;
 esac
 
-case "${ALLOW_INSECURE_SSL}" in
-    true) PROXY_SSL_VERIFY="off" ;;
-    false) PROXY_SSL_VERIFY="on" ;;
-    *) fail "allow_insecure_ssl must be true or false." ;;
-esac
+mapfile -t ALLOWED_NETWORKS < <(json_array_lines allowed_networks)
+mapfile -t CONNECT_PORTS < <(json_array_lines connect_ports)
 
-mkdir -p /etc/nginx/http.d /run/nginx /var/lib/nginx/tmp /var/log/nginx
+(( ${#ALLOWED_NETWORKS[@]} > 0 )) || fail "allowed_networks must contain at least one network or IP address."
+(( ${#CONNECT_PORTS[@]} > 0 )) || fail "connect_ports must contain at least one port."
 
-cat > "${NGINX_CONFIG}" <<EOF
-worker_processes  1;
-error_log /dev/stderr ${LOG_LEVEL};
-pid /run/nginx/nginx.pid;
+for connect_port in "${CONNECT_PORTS[@]}"; do
+    [[ "${connect_port}" =~ ^[0-9]+$ ]] || fail "connect_ports entries must be integers."
+    (( connect_port >= 1 && connect_port <= 65535 )) || fail "connect_ports entries must be between 1 and 65535."
+done
 
-events {
-    worker_connections 512;
-}
+mkdir -p /etc/tinyproxy /var/log/tinyproxy /run/tinyproxy
 
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
-    access_log /dev/stdout;
-    sendfile on;
-    keepalive_timeout 65;
-
-    map \$http_upgrade \$connection_upgrade {
-        default upgrade;
-        '' close;
-    }
-
-    include /etc/nginx/http.d/*.conf;
-}
+cat > "${TINYPROXY_CONFIG}" <<EOF
+User root
+Group root
+Port ${PORT}
+Listen 0.0.0.0
+Timeout 600
+DefaultErrorFile "/usr/share/tinyproxy/default.html"
+StatFile "/usr/share/tinyproxy/stats.html"
+LogFile "/dev/stdout"
+LogLevel ${LOG_LEVEL}
+PidFile "/run/tinyproxy/tinyproxy.pid"
+MaxClients ${MAX_CLIENTS}
+StartServers 2
+MinSpareServers 1
+MaxSpareServers 5
+ViaProxyName "haos-lightweight-forward-proxy"
+DisableViaHeader Yes
 EOF
 
-ESCAPED_TARGET_URL=$(escape_nginx_value "${TARGET_URL}")
-ESCAPED_HOST_HEADER=$(escape_nginx_value "${HOST_HEADER}")
-ESCAPED_MAX_BODY_SIZE=$(escape_nginx_value "${MAX_BODY_SIZE}")
+for network in "${ALLOWED_NETWORKS[@]}"; do
+    [[ -n "${network}" ]] || fail "allowed_networks entries must not be empty."
+    printf 'Allow %s\n' "${network}" >> "${TINYPROXY_CONFIG}"
+done
 
-cat > "${PROXY_CONFIG}" <<EOF
-server {
-    listen ${LISTEN_PORT};
-    server_name _;
+for connect_port in "${CONNECT_PORTS[@]}"; do
+    printf 'ConnectPort %s\n' "${connect_port}" >> "${TINYPROXY_CONFIG}"
+done
 
-    client_max_body_size ${ESCAPED_MAX_BODY_SIZE};
-
-    location / {
-        proxy_pass ${ESCAPED_TARGET_URL};
-        proxy_http_version 1.1;
-
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header X-Forwarded-Host \$host;
-        proxy_set_header X-Forwarded-Prefix \$http_x_ingress_path;
-
-        proxy_ssl_server_name on;
-        proxy_ssl_verify ${PROXY_SSL_VERIFY};
-        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
-
-        proxy_connect_timeout ${REQUEST_TIMEOUT}s;
-        proxy_send_timeout ${REQUEST_TIMEOUT}s;
-        proxy_read_timeout ${REQUEST_TIMEOUT}s;
-        send_timeout ${REQUEST_TIMEOUT}s;
-    }
-}
-EOF
-
-if [[ -n "${HOST_HEADER}" ]]; then
-    sed -i "/proxy_set_header X-Real-IP/i\\        proxy_set_header Host ${ESCAPED_HOST_HEADER};" "${PROXY_CONFIG}"
-else
-    sed -i "/proxy_set_header X-Real-IP/i\\        proxy_set_header Host \\$proxy_host;" "${PROXY_CONFIG}"
+if [[ -n "${UPSTREAM_PROXY}" ]]; then
+    [[ "${UPSTREAM_PROXY}" =~ ^[^[:space:]]+:[0-9]+$ ]] || fail "upstream_proxy must be host:port when set."
+    printf 'Upstream http %s\n' "${UPSTREAM_PROXY}" >> "${TINYPROXY_CONFIG}"
 fi
 
-nginx -t
+tinyproxy -t -c "${TINYPROXY_CONFIG}"
 
-bashio::log.info "Starting lightweight web proxy on port ${LISTEN_PORT}; target=${TARGET_URL}"
-exec nginx -g 'daemon off;'
+bashio::log.info "Starting lightweight forward proxy on 0.0.0.0:${PORT}"
+exec tinyproxy -d -c "${TINYPROXY_CONFIG}"
