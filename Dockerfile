@@ -3,7 +3,7 @@ FROM $BUILD_FROM
 
 ARG BUILD_ARCH
 ARG BUILD_DATE
-ARG BUILD_DESCRIPTION="Lightweight tinyproxy-based HTTP/HTTPS forward proxy for Home Assistant OS."
+ARG BUILD_DESCRIPTION="Lightweight HTTP/HTTPS forward proxy for Home Assistant OS."
 ARG BUILD_NAME="Lightweight Forward Proxy"
 ARG BUILD_REF
 ARG BUILD_VERSION
@@ -26,13 +26,10 @@ LABEL \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-RUN apk add --no-cache \
-    bash \
-    jq \
-    tinyproxy
-
+COPY bin /tmp/forward-proxy-bin
 COPY run.sh /run.sh
 RUN chmod 755 /run.sh && \
-    mkdir -p /etc/tinyproxy /var/log/tinyproxy /run/tinyproxy
+    install -m 755 "/tmp/forward-proxy-bin/${BUILD_ARCH}/forward-proxy" /usr/local/bin/forward-proxy && \
+    rm -rf /tmp/forward-proxy-bin
 
 CMD ["/run.sh"]

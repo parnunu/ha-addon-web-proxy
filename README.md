@@ -1,12 +1,12 @@
 # Lightweight Forward Proxy Home Assistant Add-on
 
-A small Home Assistant OS add-on that runs `tinyproxy` as an HTTP/HTTPS forward proxy.
+A small Home Assistant OS add-on that runs a bundled HTTP/HTTPS forward proxy.
 
 Use it when devices or services on your network need an outbound proxy endpoint running on HAOS.
 
 ## Features
 
-- Tiny `tinyproxy`-based image using Home Assistant base images.
+- No Alpine package download during HAOS install; the proxy binary is bundled in the add-on source.
 - HTTP proxy support.
 - HTTPS tunneling via `CONNECT` for configured ports.
 - Configurable listen port, allowed client networks, max clients, CONNECT ports, optional upstream proxy, and log level.
@@ -42,7 +42,7 @@ log_level: "Info"
 - `max_clients`: Maximum simultaneous proxy clients.
 - `connect_ports`: Ports allowed for HTTPS `CONNECT` tunneling.
 - `upstream_proxy`: Optional parent proxy as `host:port`.
-- `log_level`: tinyproxy log level.
+- `log_level`: Reserved for add-on UI compatibility; current logs go to stdout.
 
 ## Client examples
 

@@ -1,8 +1,8 @@
 name: Lightweight Forward Proxy
-version: "1.0.1"
+version: "1.0.2"
 slug: lightweight_forward_proxy
 description: >-
-  Lightweight tinyproxy-based HTTP/HTTPS forward proxy for Home Assistant OS.
+  Lightweight HTTP/HTTPS forward proxy for Home Assistant OS.
 url: https://github.com/parnunu/ha-addon-web-proxy
 arch:
   - aarch64

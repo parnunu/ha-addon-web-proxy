@@ -46,7 +46,7 @@ Optional parent proxy in `host:port` form. Leave blank for direct outbound conne
 
 ### Option: `log_level`
 
-tinyproxy log level: `Critical`, `Error`, `Warning`, `Notice`, `Connect`, or `Info`.
+Proxy log verbosity. Reserved for UI compatibility; current runtime logs go to stdout.
 
 ## Client setup
 
